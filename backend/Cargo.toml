@@ -1,0 +1,17 @@
+[package]
+name = "backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-web = "4.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+mongodb = "2.1"
+bson = "2.1"
+dotenv = "0.15"
+tokio = { version = "1.0", features = ["full"] }
+clap = "3.0"
+reqwest = { version = "0.11", features = ["json"] }
+uuid = { version = "0.8", features = ["v4"] }
+features = "0.10.0"
