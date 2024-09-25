@@ -23,6 +23,101 @@ struct StoreData {
     encrypted_content: String,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+struct ShareData {
+    project_id: String,
+    share_code: String,
+    encrypted_content: String,
+}
+
+async fn share_config(data: web::Json<ShareData>, state: web::Data<AppState>) -> impl Responder {
+    let collection = state.db.collection::<ShareData>("share_data");
+
+    // Check if data already exists
+    if let Ok(Some(_)) = collection
+        .find_one(doc! { "project_id": &data.project_id }, None)
+        .await
+    {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "detail": "Data already exists, use update if you want to modify it"
+        }));
+    }
+
+    let share_data = ShareData {
+        project_id: data.project_id.clone(),
+        encrypted_content: data.encrypted_content.clone(),
+        share_code: data.share_code.clone(),
+    };
+
+    match collection.insert_one(share_data, None).await {
+        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+            "message": "Data stored successfully.",
+        })),
+        Err(_) => HttpResponse::InternalServerError().json(serde_json::json!({
+            "detail": "Failed to store data"
+        })),
+    }
+}
+
+// retrieve data using share code as parameter | ShareData
+async fn pull_config(req: HttpRequest, state: web::Data<AppState>) -> impl Responder {
+    let collection = state.db.collection::<ShareData>("share_data");
+
+    let share_code = req
+        .headers()
+        .get("X-Share-Code")
+        .and_then(|h| h.to_str().ok());
+    let share_code = match share_code {
+        Some(code) => code,
+        None => {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "detail": "Missing Share Code"
+            }))
+        }
+    };
+
+    let project_id = req
+        .headers()
+        .get("X-Project-Id")
+        .and_then(|h| h.to_str().ok());
+    let project_id = match project_id {
+        Some(id) => id,
+        None => {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "detail": "Missing Project Id"
+            }))
+        }
+    };
+
+    match collection
+        .find_one(
+            doc! { "share_code": share_code, "project_id": project_id },
+            None,
+        )
+        .await
+    {
+        Ok(Some(data)) => {
+            // Delete the record after retrieval
+            collection
+                .delete_one(
+                    doc! { "share_code": share_code, "project_id": project_id },
+                    None,
+                )
+                .await
+                .unwrap();
+            HttpResponse::Ok().json(serde_json::json!({
+                "encrypted_content": data.encrypted_content
+            }))
+        }
+        Ok(None) => HttpResponse::NotFound().json(serde_json::json!({
+            "detail": "Data not found"
+        })),
+        Err(_) => HttpResponse::InternalServerError().json(serde_json::json!({
+            "detail": "Failed to retrieve data"
+        })),
+    }
+}
+
 async fn store_data(data: web::Json<StoreData>, state: web::Data<AppState>) -> impl Responder {
     let collection = state.db.collection::<EncryptedData>("encrypted_data");
 
@@ -171,6 +266,8 @@ async fn main() -> std::io::Result<()> {
             .route("/retrieve", web::get().to(retrieve_data))
             .route("/update", web::put().to(update_data))
             .route("/delete", web::delete().to(delete_data))
+            .route("/share", web::post().to(share_config))
+            .route("/share", web::get().to(pull_config))
     })
     .bind(server_url)?
     .run()

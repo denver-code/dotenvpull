@@ -3,3 +3,4 @@
 .env
 
 .env.*
+dotenvpull_config.json
