@@ -262,8 +262,8 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(state.clone())
-            .route("/store", web::post().to(store_data))
-            .route("/retrieve", web::get().to(retrieve_data))
+            .route("/push", web::post().to(store_data))
+            .route("/pull", web::get().to(retrieve_data))
             .route("/update", web::put().to(update_data))
             .route("/delete", web::delete().to(delete_data))
             .route("/share", web::post().to(share_config))
