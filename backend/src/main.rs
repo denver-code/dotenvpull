@@ -1,6 +1,7 @@
-use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{middleware::Logger, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use bson::doc;
-use dotenv::dotenv;
+use dotenv;
+use env_logger;
 use mongodb::{options::ClientOptions, Client};
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -246,7 +247,8 @@ async fn delete_data(req: HttpRequest, state: web::Data<AppState>) -> impl Respo
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    dotenv().ok();
+    dotenv::dotenv().ok();
+    env_logger::init();
 
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let database_name = env::var("DATABASE_NAME").expect("DATABASE_NAME must be set");
@@ -262,6 +264,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(state.clone())
+            .wrap(Logger::default())
             .route("/push", web::post().to(store_data))
             .route("/pull", web::get().to(retrieve_data))
             .route("/update", web::put().to(update_data))
